@@ -1,0 +1,497 @@
+/*
+ * File: BlankClass.java
+ * ---------------------
+ * This class is a blank one that you can change at will. Remember, if you change
+ * the class name, you'll need to change the filename so that it matches.
+ * Then you can extend GraphicsProgram, ConsoleProgram, or DialogProgram as you like.
+ */
+
+import java.util.ArrayList;
+import acm.graphics.*;     // GOval, GRect, etc.
+import acm.program.*;      // GraphicsProgram
+import acm.util.*;         // RandomGenerator
+import java.applet.*;      // AudioClip
+import java.awt.*;         // Color
+import java.awt.event.*;   // MouseEvent
+import java.util.ArrayList;
+
+import acm.program.*;
+import acm.util.RandomGenerator;
+import acm.graphics.*;     // GOval, GRect, etc.
+import acm.program.*;      // GraphicsProgram
+import acm.util.*;         // RandomGenerator
+import java.applet.*;      // AudioClip
+import java.awt.*;         // Color
+import java.awt.event.*;   // MouseEvent
+
+
+
+public class BlankClass extends GraphicsProgram {
+	private RandomGenerator rg = new RandomGenerator();
+	public static final int APPLICATION_HEIGHT = 600;
+	public static final int APPLICATION_WIDTH = 400; 
+	private static final double STAR_SIZE = 2.5;
+	private static final int DELAY = 10;
+	private static final int SPACESHIP_Y = APPLICATION_HEIGHT - 50; 
+	private static final double STAR_CHANCE = 0.3;
+	private static final int SPACESHIP_SIZE = 50; 
+	public static final int NALIENS_PER_ROW = 5;
+	public static final int NALIENS_ROWS = 2;
+	public static final int ALIEN_SPACE = APPLICATION_WIDTH/NALIENS_PER_ROW-1;
+	public static final int ALIEN_Y_OFFSET = APPLICATION_HEIGHT/4;
+	public static final int ALIEN_Y_SPACING = 80;
+	public static final int ALIEN_SIZE = 50; 
+	public static final double SHIP_LASER_SPEED = -6;
+	//if you want to make the game easier, lower this setting
+	public static final double ALIEN_LASER_CHANCE = 0.006; 
+	public static final int MSPACMAN_SIZE = APPLICATION_WIDTH/2; 
+	public static final double MSPACMAN_LASER_CHANCE = 0.1; 
+	public static final double MSPACMAN_ALIEN_CHANCE = 0.1; 
+	public static final double MSPACMAN_LASER_SIZE = 25; 
+	ArrayList<GOval> starList = new ArrayList<GOval>();
+	ArrayList<GRect> bulletList = new ArrayList<GRect>();
+	ArrayList<GImage> alien1List = new ArrayList <GImage>(); 
+	ArrayList<GObject> pacWomenLasers = new ArrayList <GObject>(); 
+	private GImage spaceShip; 
+	private GImage alienGif;  
+	private boolean leftEdge = false; 
+	private boolean rightEdge = false; 
+	ArrayList<GObject> alienLasers = new ArrayList<GObject>();
+	private static int LIVES = 3;
+	int alienDeathToll = 0; 
+	private GLabel score; 
+	private GRect bossHp; 
+	private boolean bossPresence = false; 
+	private boolean healthBarPresence = false; 
+	private GImage msPacMan; 
+	//if you want to actually kill pacman, reduce her hp
+	private static double MSPACMAN_HEALTH = 15; 
+	double pacVx = 3;
+	double pacVy = 0; 
+	private double alVy = 0; 
+	private boolean bossAlienY = true; 
+	private boolean bossDied = false; 
+	private boolean shipOn = false; 
+	private GRect endScreen; 
+	private boolean alienDeath = false; 
+
+	public void run() {
+		setUpGame(); 
+		while(LIVES > 0 && bossDied == false) {
+			pointsInLabel(); 
+			setUpStars(); 
+			implementAlien(); 
+			lasers();
+			implementBoss(); 
+		}	
+		endGame();
+	}
+		
+	
+	// sets up the components of the game that aren't in the while loop
+	private void setUpGame() {
+		addMouseListeners(); 
+		setUpBackground();
+		shipOn = true; 
+		makeSpaceShip(); 
+		scoreLabel(); 
+	}
+	
+	//makes background black
+	private void setUpBackground() {
+		GRect background = new GRect (APPLICATION_WIDTH, APPLICATION_HEIGHT);
+		background.setFilled(true);
+		background.setColor(Color.BLACK);
+		add(background); 
+	}
+	
+	//adds spaceship image
+	private void makeSpaceShip() {
+		spaceShip = new GImage ("transparentSpaceShip.png.png", getWidth()/2-SPACESHIP_SIZE, SPACESHIP_Y);
+		spaceShip.setSize(SPACESHIP_SIZE, SPACESHIP_SIZE);
+		add(spaceShip); 
+	}
+	
+	//allows user to move spaceship
+	public void mouseMoved(MouseEvent e) {
+		double x = e.getX() - spaceShip.getWidth()/2; 
+		if (e.getX() > 0 +spaceShip.getWidth()/2 && e.getX() < getWidth()-spaceShip.getWidth()/2) {
+			spaceShip.setLocation(x, SPACESHIP_Y);
+		}
+	}
+	
+	//sets up score label
+	private void scoreLabel() {
+		score = new GLabel ("");
+		score.setLocation(10, 40);
+		score.setColor(Color.RED);
+		score.setFont("Monospaced-30");
+		add(score);
+	}
+	
+	//provides the information for labels
+	//this is a seperate method because I keep this in the while loop
+	//so it can represent the score changing
+	private void pointsInLabel() {
+		int points = alienDeathToll * 50; 
+		score.setLabel("Score: " + points + "  Lives: " + LIVES);
+	}
+	
+	//makes stars arraylists to simulate movement
+	private void setUpStars() {
+		if(rg.nextBoolean(STAR_CHANCE)) {
+			double y = 0;
+			double x = rg.nextDouble(0, getWidth());
+			GOval star = new GOval(x, y, STAR_SIZE, STAR_SIZE);
+			star.setFilled(true);
+			star.setColor(Color.WHITE) ;
+			add(star);
+			starList.add(star);
+		}
+			for(int i = starList.size() - 1; i >= 0; i--) {
+				GOval oval = starList.get(i);
+				oval.move(0,15); 
+				if (oval.getY() >= APPLICATION_HEIGHT - oval.getHeight()) {
+					starList.remove(i); 
+					remove(starList.get(i)); 
+				} 
+			}
+	}
+	
+	//a concise way to gather all methods that deal with aliens
+	private void implementAlien() {
+		summonAlien();
+		moveAlien();
+		makeAlienShoot(); 
+	}
+	
+	//draws grid of aliens if there aren't any aliens remaining and there isn't a boss
+	private void summonAlien() {
+		if (alien1List.size() == 0 && bossPresence == false) {
+			for(int row = 0; row < NALIENS_ROWS; row++) {
+				for(int col = 0; col < NALIENS_PER_ROW; col++) {
+					double	x = col*ALIEN_SPACE;				
+					double	y = ALIEN_Y_OFFSET + row*ALIEN_Y_SPACING;
+					alien1Maker(x,y);  
+					alien1List.add(alienGif); 
+					add(alienGif); 
+				}
+			}	
+		}	
+	}
+	
+	//method that makes aliens
+	private void alien1Maker(double x, double y){
+		alienGif = new GImage ("aliengif.gif", x, y);
+		alienGif.setSize(ALIEN_SIZE , ALIEN_SIZE);
+	}
+	
+	//moves an alien left-right 
+	private void moveAlien () { 
+		//placed the vx speed conditions here so all aliens are affected
+		double vx = 2; 
+		//checks if Alien has hit the right side of the screen
+		if(rightEdge) {
+			vx = -2; 
+		}
+		//checks if alien has hit the left side of the screen
+		if(leftEdge) {
+			vx = 2; 
+		}
+		//did this for loop to control all aliens
+		for(int i = alien1List.size()-1 ; i >=0 ; i--) {
+			GImage alien1 = alien1List.get(i);  
+			// this if statement tracks when alien has reached the app_width
+			if(alien1.getX() + 2 >= getWidth()- alien1.getWidth()) {
+				rightEdge = true;
+				leftEdge = false; 
+			}
+			//this if statement happens when the aliens have returned to the left side of the screen
+			if (alien1.getX() -2 < 0 ) {
+				rightEdge = false;
+				leftEdge = true; 
+			}
+			//this alienVelocityY command is useful when the alien is spit out of msPacman
+			if(bossPresence) {
+				alien1.move(vx, alVy); 
+			} 
+			//if there isn't a boss, the aliens shouldn't move vertically
+			if(bossPresence == false) {
+				alien1.move(vx, 0);
+			}
+		} 
+			
+	}
+	
+	//makes aliens make lasers to shoot
+	private void makeAlienShoot () {
+		for(int i = alien1List.size() - 1; i >= 0; i--) {
+			GImage alien1 = alien1List.get(i);
+			//boolean chance so that lasers don't bombard user too much
+			if(rg.nextBoolean(ALIEN_LASER_CHANCE)){
+				double y = alien1.getY() + alien1.getHeight()/2;
+				double x = alien1.getX() + alien1.getWidth()/2;
+				GRect la = new GRect(x, y, 5, 20);
+				la.setFilled(true);
+				la.setColor(Color.GREEN);
+				add(la);
+				alienLasers.add(la);
+			}
+		}
+		for(int i = alienLasers.size() - 1 ; i >= 0; i--) {
+			GObject laserRect = alienLasers.get(i);
+			laserRect.move(0, 6);
+			if(laserRect.getY() > APPLICATION_HEIGHT) {
+				remove(alienLasers.get(i));
+				alienLasers.remove(i); 
+			}
+		}
+	}
+	
+	//concise way to gather laser commands
+	private void lasers() {
+		makeBullets();
+		checkForAlienDamage();
+		checkForShipDamage(alienLasers);
+	}
+	
+	//allows user to shoot
+	private void makeBullets() {
+			for(int i = bulletList.size() - 1; i >= 0; i--) {
+				GRect bullet = bulletList.get(i);
+				bullet.move(0, SHIP_LASER_SPEED);
+				if(bullet.getY() < 0) {
+					remove(bulletList.get(i));
+					bulletList.remove(i);
+				}
+				//if alien has died, remove laser from the list and canvas
+				if(alienDeath) {
+					remove(bulletList.get(i));
+					bulletList.remove(i);
+					alienDeath = false; 
+				}
+				//if laser has hit boss, remove laser from list and canvas
+				
+			}
+			//pause to slow bullets and also rest of the game in the while loop
+			//if there was no pause, game would move too fast, also if pause
+			//was elsewhere, there would be buggy/laggy shooting
+			pause(DELAY);
+		
+	}
+	
+	//event to track when user wants to shoot
+	public void mousePressed(MouseEvent event) {
+		if(shipOn) {
+			double x = event.getX();
+			double y = SPACESHIP_Y; 
+			GRect laser = new GRect (x, y, 3, 10);
+			laser.setFilled(true);
+			laser.setColor(Color.RED);
+			bulletList.add(laser); 
+			add(laser);
+			//this bullet presence will come in handy with the next method--
+			//it lets the game know when a bullet is present in the canvas
+		}
+	}
+
+	//checks if laser shot by user has hit enemy
+	private void checkForAlienDamage () {
+		//this for loop runs through all of the lasers and aliens
+		//to see if there was collision
+		for(int i = bulletList.size() - 1; i >= 0; i --) {
+			for(int al = alien1List.size() -1 ; al >= 0; al--) {
+				GRectangle alien = alien1List.get(al).getBounds();
+				GRectangle laser = bulletList.get(i).getBounds();
+				//this if command checks if the lasers have hit the aliens
+				//pretty much a getElementCommand, however getElement
+				//doesn't really work here
+				if (alien.intersects(laser)) {
+						remove(alien1List.get(al)); 									
+						alien1List.remove(al);
+						alienDeathToll++; 
+						//this alien death takes affect in the makeBullets() method, and
+						//removes the bullet from the canvas and list
+						alienDeath = true;
+				}
+			}
+		}
+	}
+	
+	//checks if lasers has hit ship. This has been repurposed 
+	//to work for any array list to reduce redundancy since I use it
+	//for ms.PacMan and aliens
+	private void checkForShipDamage(ArrayList<GObject> list) {
+		for (int i = list.size()-1; i >= 0; i--) { 
+				GRectangle spaceship = spaceShip.getBounds();
+				GRectangle listB = list.get(i).getBounds();
+				if (listB.intersects(spaceship)) {
+					remove(list.get(i));
+					list.remove(i); 
+					LIVES--; 
+				}
+			}		
+	}
+	
+	//collects all methods regarding the boss
+	private void implementBoss() {
+		summonOrRemoveBoss();
+		//these next few commands can only work if the boss is present
+		if(bossPresence) {
+			moveBoss();
+			makeBossShootBalls(); 
+			makeBossSpitAliens(); 
+			checkForShipDamage(pacWomenLasers);
+			checkForBossDamage(); 
+			bossHealthBar(); 	
+		}
+	}
+	
+	//this summons boss when 5 waves of aliens die
+	private void summonOrRemoveBoss() {
+		if(alienDeathToll == (NALIENS_PER_ROW * NALIENS_ROWS)*3 && bossPresence == false) {
+			bossPresence = true; 
+			msPacMan = new GImage ("msPacman.png", getWidth()/2 - MSPACMAN_SIZE/2, getHeight()/4);
+			msPacMan.setSize(MSPACMAN_SIZE, MSPACMAN_SIZE);
+			add(msPacMan); 
+		}
+		//when boss dies
+		if(MSPACMAN_HEALTH == 0) {
+			bossDied = true; 
+		}
+	}
+	
+	
+	//moves the boss left and right
+	private void moveBoss() {
+		//used instance variable to set speed of pacVx outside of while loop
+		//these if commands make sure ms.pacman doesn't go outside of map
+		if(msPacMan.getX() + msPacMan.getWidth()/2 >= APPLICATION_WIDTH) {
+			pacVx = -pacVx; 
+		} 
+		//if boss has hit leftside
+		if(msPacMan.getX() <= 0) {
+			pacVx = 3; 
+		}
+		msPacMan.move(pacVx, pacVy); 
+	}
+	
+	//makes the boss shoot yellow balls
+	private void makeBossShootBalls() {
+		if(rg.nextBoolean(MSPACMAN_LASER_CHANCE)) {
+			double y = msPacMan.getY() + msPacMan.getHeight()/2;
+			double x = msPacMan.getX()+ msPacMan.getWidth()/3;
+			GOval ball = new GOval(x, y, MSPACMAN_LASER_SIZE, MSPACMAN_LASER_SIZE);
+			ball.setFilled(true);
+			ball.setColor(Color.YELLOW);
+			add(ball);
+			pacWomenLasers.add(ball);
+		}
+		
+		for(int i = pacWomenLasers.size() - 1 ; i >= 0; i--) {
+			GObject laserOval = pacWomenLasers.get(i);
+			laserOval.move(0, 6);
+			if(laserOval.getY() > APPLICATION_HEIGHT) {
+				remove(pacWomenLasers.get(i));
+				pacWomenLasers.remove(i); 
+			}
+			
+		}
+	}
+	
+	//this method makes the boss slowly put out aliens to increase tension
+	private void makeBossSpitAliens() {
+		if(rg.nextBoolean(MSPACMAN_ALIEN_CHANCE) && alien1List.size() == 0) {
+			double y = msPacMan.getY() + msPacMan.getHeight()/2;
+			double x = msPacMan.getX()+ msPacMan.getWidth()/3;
+			alien1Maker(x, y); 
+			alien1List.add(alienGif); 
+			add(alienGif);
+		}
+		
+		for(int i = alien1List.size() - 1; i >= 0; i--) {
+			//this if command sees if the alien has arrived at the proper Y location 
+			if(alien1List.get(i).getY() < 3 * getHeight()/4 ) {
+				bossAlienY = false; 
+			} else {
+				//if it has, then bossAlienY becomes true
+				bossAlienY = true; 
+			}
+			//this moves the alien down to the proper location
+			if(bossAlienY == false) {
+				alVy = 1; 
+			}
+			if(bossAlienY) {
+				alVy = 0; 
+			}
+		}
+	}
+	
+	// sees if boss has been hit
+	private void checkForBossDamage() {
+		for(int i = bulletList.size()-1; i >= 0 ; i --) {
+			GRectangle pacManB = msPacMan.getBounds();
+			GRectangle laserB = bulletList.get(i).getBounds();
+			//series of if statements check if boss has been hit by a laser
+			if (laserB.intersects(pacManB)) {
+				MSPACMAN_HEALTH--; 
+				remove(bulletList.get(i));
+				bulletList.remove(i);
+			}
+		}	
+	}
+	
+	//makes health bar for boss
+	private void bossHealthBar() {
+		if(healthBarPresence == false) {
+			bossHp = new GRect (msPacMan.getWidth()/2, msPacMan.getHeight()/2);
+			bossHp.setFilled(true);
+			bossHp.setColor(Color.RED); 
+			add(bossHp); 
+			healthBarPresence = true; 
+		}
+		//this if command checks if the health bar exists and if the health bar goes outside of application
+		if(healthBarPresence && msPacMan.getX() + msPacMan.getWidth()/2 <= getWidth()) { 
+			bossHp.setLocation(msPacMan.getX(), getHeight()/4); 
+			bossHp.setSize(MSPACMAN_HEALTH * 10, 17);
+		}
+	}
+
+	//end screen when player looses
+	private void endGame() {
+		//this boolean fixes a bug where the laser a player shoots
+		//would still appear when the game ends
+		shipOn = false; 
+		endScreen = new GRect (getWidth() , getHeight());
+		endScreen.setFilled(true);
+		endScreen.setColor(Color.WHITE);
+		add(endScreen);
+		if(bossDied) {
+			GLabel winner = new GLabel ("Congrats! You win");
+			winner.setFont("Consolas-40");
+			double y = getHeight()/2 - winner.getHeight()/2;
+			double x = getWidth()/2 - winner.getWidth()/2;
+			winner.setLocation(x,y);
+			add(winner);
+
+		} else {
+			loser(); 
+		}
+	}
+	
+	//alternative ending if player loses
+	private void loser() {
+		while(true) {
+			Color randomColor = rg.nextColor();
+			endScreen.setColor(randomColor);
+			GLabel loser = new GLabel ("LOSER!");
+			loser.setFont("Consolas-40");
+			double y = getHeight()/2 - loser.getHeight()/2;
+			double x = getWidth()/2 - loser.getWidth()/2;
+			loser.setLocation(x,y);
+			add(loser);
+		}
+	}
+}
+
+
